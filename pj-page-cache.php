@@ -378,7 +378,7 @@ class Pj_Page_Cache {
 
 		// Delete in batches to avoid holding locks for long periods of time.
 		while ( time() < $time_start + $time_limit ) {
-			$affected_rows = $wpdb->query( $wpdb->prepare( "DELETE FROM `%s` WHERE `updated` < %d LIMIT %d;", self::$table_name, $timestamp, $batch ) );
+			$affected_rows = $wpdb->query( sprintf( "DELETE FROM `%s` WHERE `updated` < %d LIMIT %d;", self::$table_name, $timestamp, $batch ) );
 			if ( $affected_rows < $batch )
 				break;
 		}
