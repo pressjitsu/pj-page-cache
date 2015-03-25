@@ -35,6 +35,8 @@ class Pj_Page_Cache {
 		if ( file_exists( ABSPATH . 'pj-cache-config.php' ) )
 			require_once( ABSPATH . 'pj-cache-config.php' );
 
+		header( 'X-Pj-Cache-Status: miss' );
+
 		// Filters are not yet available, so hi-jack the $wp_filter global to add our actions.
 		$GLOBALS['wp_filter']['clean_post_cache'][10]['pj-page-cache'] = array( 'function' => array( __CLASS__, 'clean_post_cache' ), 'accepted_args' => 1 );
 		$GLOBALS['wp_filter']['transition_post_status'][10]['pj-page-cache'] = array( 'function' => array( __CLASS__, 'transition_post_status' ), 'accepted_args' => 3 );
@@ -104,12 +106,19 @@ class Pj_Page_Cache {
 			}
 
 			if ( $serve_cache ) {
-				header( 'X-Pj-Cache: ' . self::$request_hash );
-				header( sprintf( 'X-Pj-Cache-Expires: %d', self::$ttl - ( time() - $cache['updated'] ) ) );
+				header( 'X-Pj-Cache-Status: hit' );
+
+				if ( self::$debug ) {
+					header( 'X-Pj-Cache-Key: ' . self::$request_hash );
+					header( sprintf( 'X-Pj-Cache-Expires: %d', self::$ttl - ( time() - $cache['updated'] ) ) );
+				}
 
 				if ( is_array( $cache['data']['headers'] ) && ! empty( $cache['data']['headers'] ) ) {
 					foreach ( $cache['data']['headers'] as $header ) {
 						if ( strpos( strtolower( $header ), 'set-cookie' ) !== false )
+							continue;
+
+						if ( strpos( strtolower( $header ), 'x-pj-cache' ) !== false )
 							continue;
 
 						header( $header );
