@@ -22,6 +22,7 @@ class Pj_Page_Cache {
 	private static $cache = false;
 	private static $request_hash = '';
 	private static $debug_data = false;
+	private static $fcgi_regenerate = false;
 
 	private static $mysqli = null;
 	private static $table_name = '';
@@ -96,7 +97,15 @@ class Pj_Page_Cache {
 				if ( ! (int) $cache['locked'] ) {
 					$mysqli->query( sprintf( "UPDATE `%s` SET locked = 1 WHERE `hash` = '%s' LIMIT 1;", self::$table_name, self::$request_hash ) );
 					if ( $mysqli->affected_rows == 1 ) {
-						$serve_cache = false;
+
+						if ( php_sapi_name() == 'fpm-fcgi' && function_exists( 'fastcgi_finish_request' ) ) {
+							// Well, actually, if we can serve a stale copy but keep the process running
+							// to regenerate the cache in background without affecting the UX, that's great!
+							$serve_cache = true;
+							self::$fcgi_regenerate = true;
+						} else {
+							$serve_cache = false;
+						}
 					}
 
 				// If it's locked, but the lock is outdated, don't serve from cache.
@@ -106,7 +115,10 @@ class Pj_Page_Cache {
 			}
 
 			if ( $serve_cache ) {
-				header( 'X-Pj-Cache-Status: hit' );
+
+				// If we're regenareting in background, consider it a miss.
+				if ( ! self::$fcgi_regenerate )
+					header( 'X-Pj-Cache-Status: hit' );
 
 				if ( self::$debug ) {
 					header( 'X-Pj-Cache-Key: ' . self::$request_hash );
@@ -126,7 +138,13 @@ class Pj_Page_Cache {
 				}
 
 				echo $cache['data']['output'];
-				exit;
+
+				// If we can regenaret in the background, do it.
+				if ( self::$fcgi_regenerate ) {
+					fastcgi_finish_request();
+				} else {
+					exit;
+				}
 			}
 		}
 
@@ -273,6 +291,12 @@ class Pj_Page_Cache {
 			ON DUPLICATE KEY UPDATE data = '%s', locked = 0, updated = %d;", self::$table_name, self::$request_hash, self::get_url_hash(), $mysqli->real_escape_string( $data ), time(), 0, $mysqli->real_escape_string( $data ), time() ) );
 
 		$mysqli->close();
+
+		// We don't need an output if we're in a background task.
+		if ( self::$fcgi_regenerate ) {
+			$output = '';
+		}
+
 		return $output;
 	}
 

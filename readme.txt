@@ -19,6 +19,8 @@ The most efficient caching layer on [Pressjitsu](http://pressjitsu.com) is full-
 * MySQL 5.5+
 * InnoDB engine for MySQL (don't even try this with MyISAM)
 
+We also highly recommend running PHP in fpm mode with nginx, since this plugin will attempt to use `fastcgi_finish_request()` and serve stale cache data from cache while regenerating a fresh copy in the background.
+
 **How a Request is Served**
 
 When an HTTP requests hits the running WordPress instance, a request hash is generated based on the contents of the request. This hash is then searched within the cached data table, and if found and valid, it is served from cache, which means WordPress' execution stops at the advanced-cache.php level and never goes further to loading any themes, plugins, etc. This is considered a cache hit.
