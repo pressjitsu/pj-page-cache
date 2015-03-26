@@ -35,7 +35,7 @@ Unlike most caching plugins, Pj Page Cache does not offer a GUI for configuratio
 
 == Installation ==
 
-1. Install and activate the plugin just like any plugin you've installed.
+1. Copy pj-page-cache.php into into wp-content/mu-plugins.
 1. Copy the plugin's advanced-cache.php file to your wp-content directory.
 1. Place `define( 'WP_CACHE', true );` in your wp-config.php file.
 1. Visit your site's Dashboard (main site's Dashboard in a Multisite install).
