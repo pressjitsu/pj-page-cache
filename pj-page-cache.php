@@ -23,6 +23,7 @@ class Pj_Page_Cache {
 	private static $request_hash = '';
 	private static $debug_data = false;
 	private static $fcgi_regenerate = false;
+	private static $orig_headers = null;
 
 	private static $mysqli = null;
 	private static $table_name = '';
@@ -35,6 +36,9 @@ class Pj_Page_Cache {
 		// External cache configuration file.
 		if ( file_exists( ABSPATH . 'pj-cache-config.php' ) )
 			require_once( ABSPATH . 'pj-cache-config.php' );
+
+		// Store any original headers prior to us messing them up.
+		self::$orig_headers = headers_list();
 
 		header( 'X-Pj-Cache-Status: miss' );
 
@@ -98,9 +102,9 @@ class Pj_Page_Cache {
 					$mysqli->query( sprintf( "UPDATE `%s` SET locked = 1 WHERE `hash` = '%s' LIMIT 1;", self::$table_name, self::$request_hash ) );
 					if ( $mysqli->affected_rows == 1 ) {
 
-						if ( php_sapi_name() == 'fpm-fcgi' && function_exists( 'fastcgi_finish_request' ) ) {
+						if ( self::can_fcgi_regenerate() ) {
 							// Well, actually, if we can serve a stale copy but keep the process running
-							// to regenerate the cache in background without affecting the UX, that's great!
+							// to regenerate the cache in background without affecting the UX, that will be great!
 							$serve_cache = true;
 							self::$fcgi_regenerate = true;
 						} else {
@@ -125,23 +129,27 @@ class Pj_Page_Cache {
 					header( sprintf( 'X-Pj-Cache-Expires: %d', self::$ttl - ( time() - $cache['updated'] ) ) );
 				}
 
-				if ( is_array( $cache['data']['headers'] ) && ! empty( $cache['data']['headers'] ) ) {
-					foreach ( $cache['data']['headers'] as $header ) {
-						if ( strpos( strtolower( $header ), 'set-cookie' ) !== false )
-							continue;
+				// Output cached status code.
+				if ( ! empty( $cache['data']['status'] ) )
+					http_response_code( $cache['data']['status'] );
 
-						if ( strpos( strtolower( $header ), 'x-pj-cache' ) !== false )
-							continue;
-
+				// Output cached headers.
+				if ( is_array( $cache['data']['headers'] ) && ! empty( $cache['data']['headers'] ) )
+					foreach ( $cache['data']['headers'] as $header )
 						header( $header );
-					}
-				}
 
 				echo $cache['data']['output'];
 
-				// If we can regenaret in the background, do it.
+				// If we can regenerate in the background, do it.
 				if ( self::$fcgi_regenerate ) {
 					fastcgi_finish_request();
+
+					// Re-issue any original headers that we had.
+					pj_sapi_headers_clean();
+					if ( ! empty( self::$orig_headers ) )
+						foreach ( self::$orig_headers as $header )
+							header( $header );
+
 				} else {
 					exit;
 				}
@@ -150,6 +158,13 @@ class Pj_Page_Cache {
 
 		// Cache it, smash it.
 		ob_start( array( __CLASS__, 'output_buffer' ) );
+	}
+
+	/**
+	 * Returns true if we can regenerate the request in background.
+	 */
+	private static function can_fcgi_regenerate() {
+		return ( php_sapi_name() == 'fpm-fcgi' && function_exists( 'fastcgi_finish_request' ) && function_exists( 'pj_sapi_headers_clean' ) );
 	}
 
 	/**
@@ -274,8 +289,23 @@ class Pj_Page_Cache {
 	public static function output_buffer( $output ) {
 		$data = array(
 			'output' => $output,
-			'headers' => headers_list(),
+			'headers' => array(),
+			'status' => http_response_code(),
 		);
+
+		// Clean up headers he don't want to store.
+		foreach ( headers_list() as $header ) {
+			// Never store X-Pj-Cache-* headers in cache.
+			if ( strpos( strtolower( $header ), 'x-pj-cache' ) !== false )
+				continue;
+
+			// Never store Set-Cookie headers in cache, just in case somebody
+			// was smart enough to completely override self::maybe_bail().
+			if ( strpos( strtolower( $header ), 'set-cookie' ) !== false )
+				continue;
+
+			$data['headers'][] = $header;
+		}
 
 		if ( self::$debug ) {
 			$data['debug'] = self::$debug_data;
@@ -293,9 +323,8 @@ class Pj_Page_Cache {
 		$mysqli->close();
 
 		// We don't need an output if we're in a background task.
-		if ( self::$fcgi_regenerate ) {
-			$output = '';
-		}
+		if ( self::$fcgi_regenerate )
+			return;
 
 		return $output;
 	}
