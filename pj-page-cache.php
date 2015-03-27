@@ -23,7 +23,6 @@ class Pj_Page_Cache {
 	private static $request_hash = '';
 	private static $debug_data = false;
 	private static $fcgi_regenerate = false;
-	private static $orig_headers = null;
 
 	private static $mysqli = null;
 	private static $table_name = '';
@@ -36,9 +35,6 @@ class Pj_Page_Cache {
 		// External cache configuration file.
 		if ( file_exists( ABSPATH . 'pj-cache-config.php' ) )
 			require_once( ABSPATH . 'pj-cache-config.php' );
-
-		// Store any original headers prior to us messing them up.
-		self::$orig_headers = headers_list();
 
 		header( 'X-Pj-Cache-Status: miss' );
 
@@ -143,12 +139,7 @@ class Pj_Page_Cache {
 				// If we can regenerate in the background, do it.
 				if ( self::$fcgi_regenerate ) {
 					fastcgi_finish_request();
-
-					// Re-issue any original headers that we had.
 					pj_sapi_headers_clean();
-					if ( ! empty( self::$orig_headers ) )
-						foreach ( self::$orig_headers as $header )
-							header( $header );
 
 				} else {
 					exit;
