@@ -116,7 +116,7 @@ class Pj_Page_Cache {
 
 			if ( $serve_cache ) {
 
-				// If we're regenareting in background, consider it a miss.
+				// If we're regenareting in background, let everyone know.
 				$status = ( self::$fcgi_regenerate ) ? 'expired' : 'hit';
 				header( 'X-Pj-Cache-Status: ' . $status );
 
@@ -245,14 +245,6 @@ class Pj_Page_Cache {
 			}
 		}
 
-		$headers = headers_list();
-		foreach ( $headers as $header ) {
-			// Don't cache responses with Set-Cookie headers.
-			if ( strpos( strtolower( $header ), 'set-cookie' ) === 0 ) {
-				return true;
-			}
-		}
-
 		return false; // Don't bail.
 	}
 
@@ -286,13 +278,12 @@ class Pj_Page_Cache {
 
 		// Clean up headers he don't want to store.
 		foreach ( headers_list() as $header ) {
+			// Don't even attempt to cache requests with Set-Cookie headers.
+			if ( strpos( strtolower( $header ), 'set-cookie' ) !== false )
+				return $output;
+
 			// Never store X-Pj-Cache-* headers in cache.
 			if ( strpos( strtolower( $header ), 'x-pj-cache' ) !== false )
-				continue;
-
-			// Never store Set-Cookie headers in cache, just in case somebody
-			// was smart enough to completely override self::maybe_bail().
-			if ( strpos( strtolower( $header ), 'set-cookie' ) !== false )
 				continue;
 
 			$data['headers'][] = $header;
