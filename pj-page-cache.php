@@ -117,8 +117,8 @@ class Pj_Page_Cache {
 			if ( $serve_cache ) {
 
 				// If we're regenareting in background, consider it a miss.
-				if ( ! self::$fcgi_regenerate )
-					header( 'X-Pj-Cache-Status: hit' );
+				$status = ( self::$fcgi_regenerate ) ? 'expired' : 'hit';
+				header( 'X-Pj-Cache-Status: ' . $status );
 
 				if ( self::$debug ) {
 					header( 'X-Pj-Cache-Key: ' . self::$request_hash );
