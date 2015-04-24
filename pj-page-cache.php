@@ -55,6 +55,10 @@ class Pj_Page_Cache {
 		if ( self::maybe_bail() )
 			return;
 
+		// Strip ETag and If-Modified-Since headers.
+		unset( $_SERVER['HTTP_IF_NONE_MATCH'] );
+		unset( $_SERVER['HTTP_IF_MODIFIED_SINCE'] );
+
 		$request_hash = array(
 			'request' => self::parse_request_uri( $_SERVER['REQUEST_URI'] ),
 			'host' => $_SERVER['HTTP_HOST'],
