@@ -324,7 +324,7 @@ class Pj_Page_Cache {
 			return md5( $_SERVER['HTTP_HOST'] . self::parse_request_uri( $_SERVER['REQUEST_URI'] ) );
 
 		$parsed = parse_url( $url );
-		$request_uri = $parsed['path'];
+		$request_uri = ! empty( $parsed['path'] ) ? $parsed['path'] : '';
 		if ( ! empty( $parsed['query'] ) )
 			$request_uri .= '?' . $parsed['query'];
 
