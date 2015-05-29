@@ -403,7 +403,7 @@ class Pj_Page_Cache {
 				UNIQUE KEY (`hash`),
 				KEY (`url_hash`),
 				KEY (`updated`)
-			) ENGINE=InnoDB DEFAULT CHARSET=utf8;", self::$table_name ) );
+			) ENGINE=InnoDB DEFAULT CHARSET=%s COLLATE=%s;", self::$table_name, $wpdb->charset, $wpdb->collate ) );
 			update_site_option( 'pj_page_cache_version', self::$version );
 		}
 
