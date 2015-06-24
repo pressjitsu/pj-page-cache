@@ -343,7 +343,7 @@ class Pj_Page_Cache {
 	 */
 	public static function clean_post_cache( $post_id ) {
 		$post = get_post( $post_id );
-		if ( $post->post_status != 'publish' )
+		if ( empty( $post->post_status ) || $post->post_status != 'publish' )
 			return;
 
 		self::clear_cache_by_post_id( $post_id );
